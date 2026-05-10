@@ -101,6 +101,27 @@ Future improvements planned:
 
 ---
 
+## Screenshots
+
+<img width="2508" height="1244" alt="image" src="https://github.com/user-attachments/assets/dccd1c4a-4881-43e2-b714-5cdf453b5c72" />
+
+<img width="2508" height="1244" alt="image" src="https://github.com/user-attachments/assets/8df6845a-56c7-4c21-aa21-c5910658cfbb" />
+
+<img width="2508" height="1244" alt="image" src="https://github.com/user-attachments/assets/e7ec5250-f428-462c-b025-e1aa8dba0c6f" />
+
+<img width="2508" height="1244" alt="image" src="https://github.com/user-attachments/assets/8f73c244-3966-41e4-bea4-e32c051e3315" />
+
+<img width="2508" height="1244" alt="image" src="https://github.com/user-attachments/assets/dc96ebc6-a35e-4a0c-b34c-54f00f97be4b" />
+
+<img width="2508" height="1244" alt="image" src="https://github.com/user-attachments/assets/4f326344-c6cd-4593-9bae-20ab96e7661c" />
+
+<img width="2508" height="1244" alt="image" src="https://github.com/user-attachments/assets/0154a899-d0c8-427d-b3e0-76a2d86755f4" />
+
+<img width="2508" height="1244" alt="image" src="https://github.com/user-attachments/assets/4c231904-504c-41f3-86a9-4ada76b12783" />
+
+<img width="2508" height="1244" alt="image" src="https://github.com/user-attachments/assets/9fd39172-c591-427e-92ee-9ff04d6712d4" />
+
+---
 
 ## License
 
