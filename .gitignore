@@ -1,24 +1,32 @@
-# Logs
-logs
+# Dependencies and production build
+node_modules/
+dist/
+coverage/
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+private/
+
+# Android generated/local files
+android/.gradle/
+android/local.properties
+android/app/build/
+android/build/
+android/app/src/main/assets/web/
+*.apk
+*.aab
+
+# Development/editor artifacts
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+Thumbs.db
+.idea/
+.vscode/
+*.tsbuildinfo

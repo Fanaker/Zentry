@@ -1,0 +1,46 @@
+import {PGlite} from '@electric-sql/pglite';
+import fs from 'node:fs/promises';
+import assert from 'node:assert/strict';
+const db=new PGlite();let checks=0;
+await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE SCHEMA auth; CREATE TABLE auth.users(id uuid PRIMARY KEY,email text); CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$SELECT NULLIF(current_setting('request.jwt.claim.sub',true),'')::uuid$$; CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$SELECT jsonb_build_object('aal',COALESCE(current_setting('request.jwt.claim.aal',true),'aal1'))$$; GRANT USAGE ON SCHEMA auth, public TO authenticated,anon; GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA auth TO authenticated,anon;`);
+for(const f of ['INSTALL_NEW.sql','upgrade-2.1.2-aliases.sql','upgrade-2.1.2-aliases.sql'])await db.exec(await fs.readFile(new URL('../database/'+f,import.meta.url),'utf8'));
+const A='00000000-0000-4000-8000-000000000001',B='00000000-0000-4000-8000-000000000002',C='00000000-0000-4000-8000-000000000003';
+await db.query('INSERT INTO auth.users(id) VALUES($1),($2),($3)',[A,B,C]);await db.query('INSERT INTO public.app_access(owner_id) VALUES($1),($2),($3)',[A,B,C]);
+async function login(id){await db.exec(`RESET ROLE; SELECT set_config('request.jwt.claim.sub','${id}',false); SET ROLE authenticated;`);}
+await login(A);
+const account=(await db.query("INSERT INTO public.accounts(name,account_type) VALUES('BCP-YAPE','debit') RETURNING id")).rows[0].id;
+const category=(await db.query("INSERT INTO public.categories(name,tx_type) VALUES('Alimentación','expense') RETURNING id")).rows[0].id;
+const cash=(await db.query("INSERT INTO public.accounts(name,account_type) VALUES('Efectivo','cash') RETURNING id")).rows[0].id;
+await db.query("INSERT INTO public.capture_aliases(field,phrase_key,phrase,target_id) VALUES('account','mi yape','mi Yape',$1)",[account]);
+assert.equal((await db.query("SELECT target_id FROM public.capture_aliases WHERE phrase_key='mi yape'")).rows[0].target_id,account);checks++;
+await login(B);
+assert.equal((await db.query('SELECT count(*)::int n FROM public.capture_aliases')).rows[0].n,0);checks++;
+await assert.rejects(()=>db.query("INSERT INTO public.capture_aliases(field,phrase_key,phrase,target_id) VALUES('account','ajena','ajena',$1)",[account]));checks++;
+await login(A);
+const own=await db.query('SELECT count(*)::int n FROM public.accounts');assert.equal(own.rows[0].n,2);checks++;
+await login(B);assert.equal((await db.query('SELECT count(*)::int n FROM public.accounts')).rows[0].n,0);checks++;
+await db.query("INSERT INTO public.accounts(name,account_type) VALUES('Efectivo','cash')");checks++;
+async function rejects(sql,params=[]){await assert.rejects(()=>db.query(sql,params));checks++;}
+await rejects("INSERT INTO public.transactions(tx_date,tx_type,amount_pen,payment_account_id) VALUES('2026-11-04','expense',10,$1)",[account]);
+await login(A);
+await rejects("INSERT INTO public.transactions(tx_date,tx_type,amount_pen,payment_account_id) VALUES('2026-11-04','expense',-1,$1)",[account]);
+await rejects("INSERT INTO public.transactions(tx_date,tx_type,amount_pen) VALUES('2026-11-04','expense',10)");
+await rejects("INSERT INTO public.transactions(tx_date,tx_type,amount_pen,origin_account_id,destination_account_id) VALUES('2026-11-04','transfer',10,$1,$1)",[account]);
+await rejects("INSERT INTO public.transactions(tx_date,tx_type,amount_pen,payment_account_id) VALUES('2026-11-04','expense','NaN',$1)",[account]);
+const id=crypto.randomUUID();await db.query('INSERT INTO public.capture_drafts(id,transcript) VALUES($1,$2)',[id,'Gasté 25 soles']);
+const payload={tx_date:'2026-11-04',tx_type:'expense',currency:'PEN',amount_pen:25,amount_usd:0,payment_account_id:account,category_id:category};
+const post=await db.query('SELECT public.post_capture($1,$2) id',[id,payload]);const retry=await db.query('SELECT public.post_capture($1,$2) id',[id,payload]);assert.equal(post.rows[0].id,retry.rows[0].id);checks++;assert.equal((await db.query('SELECT count(*)::int n FROM public.transactions')).rows[0].n,1);checks++;
+const draft=crypto.randomUUID();await db.query('INSERT INTO public.capture_drafts(id) VALUES($1)',[draft]);assert.equal((await db.query('SELECT count(*)::int n FROM public.transactions')).rows[0].n,1);checks++;
+const badRows=[{tx_date:'2026-11-04',tx_type:'expense',currency:'PEN',amount_pen:10,amount_usd:0,payment_account:'BCP-YAPE',category:'Alimentación'},{tx_date:'2026-11-04',tx_type:'expense',currency:'PEN',amount_pen:-2,amount_usd:0,payment_account:'BCP-YAPE',category:'Alimentación'}];
+await rejects('SELECT public.import_excel($1,$2)',[badRows,'a'.repeat(64)]);assert.equal((await db.query('SELECT count(*)::int n FROM public.transactions')).rows[0].n,1);checks++;
+const good=[badRows[0]];await db.query('SELECT public.import_excel($1,$2)',[good,'b'.repeat(64)]);await rejects('SELECT public.import_excel($1,$2)',[good,'b'.repeat(64)]);
+const backup=(await db.query('SELECT public.export_personal_backup() backup')).rows[0].backup;
+await rejects('SELECT public.restore_personal_backup($1)',[backup]);
+await login(C);const invalid=structuredClone(backup);invalid.tables.transactions[0].payment_account_id=crypto.randomUUID();await rejects('SELECT public.restore_personal_backup($1)',[invalid]);assert.equal((await db.query('SELECT count(*)::int n FROM public.accounts')).rows[0].n,0);checks++;
+// UUIDs are global: restore in another empty database, as on migration to a new project.
+await db.exec('RESET ROLE');for(const t of ['capture_drafts','import_batches','transactions','monthly_closings','budgets','backup_history','people','categories','accounts'])await db.query(`DELETE FROM public.${t} WHERE owner_id=$1`,[A]);
+await login(C);await db.query('SELECT public.restore_personal_backup($1)',[backup]);assert.equal((await db.query('SELECT count(*)::int n FROM public.transactions')).rows[0].n,2);checks++;
+await db.exec('RESET ROLE');await db.query('UPDATE public.app_access SET require_mfa=true WHERE owner_id=$1',[C]);await login(C);assert.equal((await db.query('SELECT count(*)::int n FROM public.transactions')).rows[0].n,0);checks++;
+await db.exec("SELECT set_config('request.jwt.claim.aal','aal2',false);");assert.equal((await db.query('SELECT count(*)::int n FROM public.transactions')).rows[0].n,2);checks++;
+await db.exec("RESET ROLE; SET ROLE anon;");await rejects('SELECT * FROM public.transactions');await rejects('SELECT * FROM public.capture_aliases');
+console.log(`PASS: ${checks} database integrity/security checks, real PostgreSQL (PGlite).`);await db.close();
