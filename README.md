@@ -6,7 +6,6 @@ Zentry is a personal finance management application built to consolidate everyda
 
 **[Leer en español](docs/README_ES.md)** · [Changelog](CHANGELOG.md) · [Deployment guide](PUBLICAR_WEB.md)
 
-> **Portfolio project.** This repository contains the application's source code, database setup scripts, Android wrapper, and automated tests. It does **not** contain personal financial records, production credentials, APKs, or a public demo account.
 
 ## Features
 
